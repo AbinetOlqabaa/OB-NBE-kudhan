@@ -8,12 +8,13 @@ import { DynamicAreaDefinition, DynamicRowRecord } from '../types/regulatory.ts'
 import { Plus, Trash2, Table as TableIcon, LayoutGrid, List, AlertCircle } from 'lucide-react';
 import { Pagination } from './Pagination.tsx';
 import { ValidationEngine, ValidationSummary } from '../utils/validationEngine.ts';
+import type { FormValidationState } from '../services/zodValidationService.ts';
 
 interface DynamicAreaTableProps {
   area: DynamicAreaDefinition;
   rows: DynamicRowRecord[];
   readOnly?: boolean;
-  validation?: ValidationSummary | null;
+  validation?: ValidationSummary | FormValidationState | null;
   onAddRow: () => void;
   onUpdateCell: (rowId: string, columnCode: string, value: any) => void;
   onDeleteRow: (rowId: string) => void;
@@ -138,7 +139,9 @@ export const DynamicAreaTable: React.FC<DynamicAreaTableProps> = ({
                         row.values && row.values[col.Code] !== undefined
                           ? row.values[col.Code]
                           : (row as any)[col.Code] ?? '';
-                      const cellErr = ValidationEngine.getDynamicCellError(validation || null, area.Area, row.id, col.Code);
+                      const cellErr =
+                        (validation as any)?.getDynamicError?.(area.Area, row.id, col.Code) ||
+                        ValidationEngine.getDynamicCellError(validation || null, area.Area, row.id, col.Code);
                       return (
                         <div key={col.Code} className="space-y-1">
                           <div className="flex items-center justify-between text-[11px]">
@@ -239,7 +242,9 @@ export const DynamicAreaTable: React.FC<DynamicAreaTableProps> = ({
 
                     {area.DynamicItems.map((col) => {
                       const val = (row.values && row.values[col.Code] !== undefined) ? row.values[col.Code] : ((row as any)[col.Code] ?? '');
-                      const cellErr = ValidationEngine.getDynamicCellError(validation || null, area.Area, row.id, col.Code);
+                      const cellErr =
+                        (validation as any)?.getDynamicError?.(area.Area, row.id, col.Code) ||
+                        ValidationEngine.getDynamicCellError(validation || null, area.Area, row.id, col.Code);
                       return (
                         <td key={col.Code} className="py-1.5 px-2">
                           {readOnly ? (

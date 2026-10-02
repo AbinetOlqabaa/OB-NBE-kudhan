@@ -12,7 +12,13 @@ import {
 } from '../types/regulatory.ts';
 import { DynamicAreaTable } from './DynamicAreaTable.tsx';
 import { FormulaEngine } from '../utils/formulaEngine.ts';
+import * as XLSX from 'xlsx';
 import { ValidationEngine, ValidationSummary } from '../utils/validationEngine.ts';
+import {
+  ZodValidationService,
+  FormValidationState,
+  ZodFieldError,
+} from '../services/zodValidationService.ts';
 import { ExcelService } from '../utils/excelService.ts';
 import { Pagination } from './Pagination.tsx';
 import { PdfReportGenerator } from '../utils/pdfReportGenerator.ts';
@@ -66,7 +72,7 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
   const metadata = submission.templateSnapshot || passedMetadata;
   const [values, setValues] = useState<Record<string, string | number>>(submission.values || {});
   const [dynamicRows, setDynamicRows] = useState<Record<number, DynamicRowRecord[]>>(submission.dynamicRows || {});
-  const [validation, setValidation] = useState<ValidationSummary | null>(null);
+  const [validation, setValidation] = useState<FormValidationState | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
@@ -208,14 +214,14 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
     vibrate(20);
   };
 
-  // Recalculate formulas and validations
+  // Recalculate formulas and validations using real-time Zod schema engine
   const recalculateAndValidate = (
     currentVals: Record<string, string | number>,
     currentDynamic: Record<number, DynamicRowRecord[]>
-  ) => {
+  ): Record<string, string | number> => {
     const calculatedVals = FormulaEngine.calculateReport(metadata, currentVals, currentDynamic);
-    const valSummary = ValidationEngine.validateReport(metadata, calculatedVals, currentDynamic);
-    setValidation(valSummary);
+    const zodValidationState = ZodValidationService.validateReport(metadata, calculatedVals, currentDynamic);
+    setValidation(zodValidationState);
     return calculatedVals;
   };
 
@@ -701,43 +707,65 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
             {validation.isValid ? (
               <span className="text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 px-2 py-0.5 rounded-md">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>All Validations Passed (100%)</span>
+                <span>Zod Validated: All Constraints Passed (100%)</span>
               </span>
             ) : (
               <span className="text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/80 px-2 py-0.5 rounded-md">
                 <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                <span>{validation.errorsCount} Error(s) detected</span>
+                <span>Zod Schema: {validation.errorsCount} Error(s) detected</span>
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* 3.5 Real-Time Validation Error Banner */}
+      {/* 3.5 Real-Time Zod Validation Error Banner */}
       {validation && !validation.isValid && (
-        <div className="bg-rose-50 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-900 rounded-xl px-3.5 py-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs shrink-0 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-            <div className="leading-tight">
-              <span className="font-bold text-rose-900 dark:text-rose-100">
-                {validation.errorsCount} Validation Error(s) Detected Before Submission
-              </span>
-              <span className="hidden sm:inline text-rose-700 dark:text-rose-300 ml-1.5">
-                • Currency format, percentage range, and mandatory field rules must be resolved.
-              </span>
+        <div className="bg-rose-50 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-900 rounded-xl px-3.5 py-2.5 text-xs flex flex-col gap-2 shadow-2xs shrink-0 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <div className="leading-tight">
+                <span className="font-bold text-rose-900 dark:text-rose-100">
+                  {validation.errorsCount} Real-Time Validation Constraint Error(s) Detected Before Submission
+                </span>
+                <span className="hidden sm:inline text-rose-700 dark:text-rose-300 ml-1.5">
+                  • Zod schema validator enforced mandatory fields, currency ranges, and non-negativity.
+                </span>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setItemTypeFilter(itemTypeFilter === 'ERRORS_ONLY' ? 'ALL' : 'ERRORS_ONLY')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                itemTypeFilter === 'ERRORS_ONLY'
+                  ? 'bg-rose-700 text-white shadow-xs'
+                  : 'bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {itemTypeFilter === 'ERRORS_ONLY' ? 'Showing Errors Only' : 'Filter to Errors Only'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setItemTypeFilter(itemTypeFilter === 'ERRORS_ONLY' ? 'ALL' : 'ERRORS_ONLY')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              itemTypeFilter === 'ERRORS_ONLY'
-                ? 'bg-rose-700 text-white'
-                : 'bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
-            }`}
-          >
-            {itemTypeFilter === 'ERRORS_ONLY' ? 'Showing Errors Only' : 'Filter to Errors Only'}
-          </button>
+
+          {/* Issue Pills Preview */}
+          {validation.allErrors && validation.allErrors.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-rose-200 dark:border-rose-900/60 max-h-24 overflow-y-auto">
+              {validation.allErrors.slice(0, 5).map((err, i) => (
+                <span
+                  key={`${err.code}_${i}`}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium bg-white dark:bg-slate-900/90 text-rose-800 dark:text-rose-200 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800"
+                >
+                  <span className="font-mono font-bold">{err.code}:</span>
+                  <span className="truncate max-w-[200px]">{err.message}</span>
+                </span>
+              ))}
+              {validation.allErrors.length > 5 && (
+                <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold self-center">
+                  +{validation.allErrors.length - 5} more issue(s)
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -842,7 +870,10 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
                   const currentVal = values[item.Code] !== undefined ? values[item.Code] : '';
                   const isFormula = metadata.Formulas.some((f) => f.targetCode === item.Code);
                   const formulaDef = metadata.Formulas.find((f) => f.targetCode === item.Code);
-                  const fieldError = ValidationEngine.getFieldError(validation, item.Code);
+                  const fieldError =
+                    validation?.getFieldError?.(item.Code) ||
+                    validation?.fieldErrorsMap?.[item.Code] ||
+                    ValidationEngine.getFieldError(validation, item.Code);
                   const hasError = !!fieldError && fieldError.severity === 'ERROR';
                   const hasWarning = !!fieldError && fieldError.severity === 'WARNING';
 
@@ -894,7 +925,14 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
                               }`}
                             >
                               <AlertCircle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${hasError ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`} />
-                              <span>{fieldError.message}</span>
+                              <div className="flex flex-col">
+                                <span>{fieldError.message}</span>
+                                {(fieldError as any).constraintType && (
+                                  <span className="text-[9px] uppercase tracking-wider font-mono opacity-80 text-rose-800 dark:text-rose-300">
+                                    [Constraint: {(fieldError as any).constraintType.replace('_', ' ')}]
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
 

@@ -367,6 +367,8 @@ import { runPhase20RegulatoryReportingXlsxExportTests } from './phase20-regulato
 import { runPhase21RealtimeFieldLevelValidationTests } from './phase21-realtime-field-level-validation.test.ts';
 import { runPhase22XlsxSheetJsExportTests } from './phase22-xlsx-sheetjs-export.test.ts';
 import { runPhase23IndexedDbAutoSaveTests } from './phase23-indexeddb-autosave.test.ts';
+import { runPhase24ZodRealtimeValidationTests } from './phase24-zod-realtime-validation.test.ts';
+import { runPhase25XlsxNbeOfflineExportTests } from './phase25-xlsx-nbe-offline-export.test.ts';
 import { runXlsxExportAndDynamicValidationTests } from './xlsx-export-and-dynamic-validation.test.ts';
 
 async function runFullApplicationTestSuite() {
@@ -391,6 +393,8 @@ async function runFullApplicationTestSuite() {
   await runPhase21RealtimeFieldLevelValidationTests();
   await runPhase22XlsxSheetJsExportTests();
   await runPhase23IndexedDbAutoSaveTests();
+  await runPhase24ZodRealtimeValidationTests();
+  await runPhase25XlsxNbeOfflineExportTests();
   await runXlsxExportAndDynamicValidationTests();
   await runPdfAndSnapshotTests();
   await runIndexedDbOfflineStorageTests();
