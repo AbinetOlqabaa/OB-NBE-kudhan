@@ -369,6 +369,7 @@ import { runPhase22XlsxSheetJsExportTests } from './phase22-xlsx-sheetjs-export.
 import { runPhase23IndexedDbAutoSaveTests } from './phase23-indexeddb-autosave.test.ts';
 import { runPhase24ZodRealtimeValidationTests } from './phase24-zod-realtime-validation.test.ts';
 import { runPhase25XlsxNbeOfflineExportTests } from './phase25-xlsx-nbe-offline-export.test.ts';
+import { runPhase26PasswordAndPriorEnrollmentBiometricResetTests } from './phase26-password-and-prior-enrollment-biometric-reset.test.ts';
 import { runXlsxExportAndDynamicValidationTests } from './xlsx-export-and-dynamic-validation.test.ts';
 
 async function runFullApplicationTestSuite() {
@@ -395,6 +396,7 @@ async function runFullApplicationTestSuite() {
   await runPhase23IndexedDbAutoSaveTests();
   await runPhase24ZodRealtimeValidationTests();
   await runPhase25XlsxNbeOfflineExportTests();
+  await runPhase26PasswordAndPriorEnrollmentBiometricResetTests();
   await runXlsxExportAndDynamicValidationTests();
   await runPdfAndSnapshotTests();
   await runIndexedDbOfflineStorageTests();

@@ -1130,6 +1130,21 @@ app.post('/api/auth/biometrics/device/rename', (req, res) => {
   }
 });
 
+// 10b. Verify Credentials and Prior Enrollment for Reset
+app.post('/api/auth/biometrics/reset/verify', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ success: false, message: 'Corporate email and password are required.' });
+    return;
+  }
+  const result = biometricService.verifyResetCredentialsAndEnrollment(email, password);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(result.validCredentials ? 422 : 401).json(result);
+  }
+});
+
 // 11. Request Step-up Authenticated Reset
 app.post('/api/auth/biometrics/reset/request', (req, res) => {
   const { email, type, password, reason, actorEmail } = req.body;
