@@ -4,6 +4,40 @@ All notable changes and engineering enhancements for the Oromia Bank NBE Regulat
 
 ---
 
+## [28.0.0-phase28-logout-confirmation-and-dashboard-responsibility-cleanup] - 2026-10-02
+
+### Added & Enhanced
+- **Phase 28: Logout Confirmation and Dashboard Responsibility Cleanup (`App.tsx`, `Sidebar.tsx`, `BottomNavigation.tsx`, `MobileBottomNav.tsx`, `CommandPaletteModal.tsx`, `useSwipeGesture.ts`, `SystemHealthDashboard.tsx`, `Phase2SSOTView.tsx`, `phase28-logout-confirmation-and-dashboard-responsibility-cleanup.test.ts`)**:
+  - **Explicit Logout Confirmation Dialog & Cancel Lifecycle (Requirements 1, 2, 3)**:
+    - Initiates an explicit confirmation modal upon clicking "Logout" in Navbar, Sidebar (desktop expanded or collapsed), or Mobile Navigation Drawer.
+    - Prevents immediate/accidental termination of active banking sessions.
+    - Clicking "Cancel" cleanly keeps the session active without interruption.
+  - **Pre-Logout Pending Autosave Flush & Safeguards (Requirements 4, 5)**:
+    - Before confirmed logout, pending draft changes in active report returns are flushed to the server.
+    - If server persistence fails, work is NOT silently discarded; a clear persistence warning is shown with options to "Retry Save & Sign Out" or "Discard & Sign Out".
+  - **Authentication Invalidation & Transient Biometric State Purge (Requirement 6)**:
+    - On confirmed sign-out, session tokens and sensitive transient biometric state (`ob_internal_hw_diagnostic`, `ob_biometric_challenge`, `ob_face_auth_temp`, `ob_active_session_token`, `ob_auth_history_cache`) are purged from storage.
+    - Persisted drafts in local storage, IndexedDB, and server SSOT remain safely preserved.
+  - **System Health Removal from Non-Admin Dashboards (Requirements 7, 8)**:
+    - Strictly removed System Health from Maker, Checker, and Auditor dashboards, including Sidebar navigation, Command Palette, mobile bottom bars, and swipe gestures.
+    - `isTabAuthorized('SYSTEM_HEALTH', role)` returns `true` exclusively for `ADMIN`.
+    - `SystemHealthDashboard` guards component execution and suppresses hardware capabilities probes/telemetry polling if non-admin.
+    - Preserved System Health telemetry and diagnostic capabilities for Administrator.
+  - **SSOT Lakehouse & Medallion Pipeline Removal from Non-Admin Dashboards (Requirements 9, 10)**:
+    - Strictly removed the Phase 2 SSOT Lakehouse & Medallion Pipeline from Maker, Checker, and Auditor dashboards, navigation bars, and swipe gestures.
+    - `isTabAuthorized('PHASE2_SSOT', role)` returns `true` exclusively for `ADMIN`.
+    - `Phase2SSOTView` guards component execution and suppresses `/api/phase2/quality` and `/api/phase2/reconcile` API calls if non-admin.
+    - Preserved full SSOT Lakehouse and Medallion pipeline capability for Administrator.
+  - **Backend Functionality & Administrative Governance (Requirement 11, 12, 13)**:
+    - Preserved backend health and SSOT endpoints for Administrator governance.
+    - Unified role-aware dashboard composition without duplicated code.
+    - Reclaimed layout space across desktop, tablet, and mobile screen configurations.
+  - **Acceptance Testing Suite (Requirement 14)**:
+    - Created `src/tests/phase28-logout-confirmation-and-dashboard-responsibility-cleanup.test.ts` with 100% pass across all assertions.
+    - Verified full regression test suite across all 28 registered phases.
+
+---
+
 ## [26.0.0-phase26-library-role-based-workflows-and-deletion-governance] - 2026-10-02
 
 ### Added & Enhanced

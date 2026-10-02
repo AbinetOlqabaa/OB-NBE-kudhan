@@ -92,8 +92,9 @@ export const isTabAuthorizedForRole = (tab: ViewTab, role?: string): boolean => 
     case 'NBE_SIMULATOR':
       return role === 'ADMIN' || role === 'CHECKER';
     case 'PHASE2_SSOT':
-    case 'AUDIT_TRAIL':
     case 'SYSTEM_HEALTH':
+      return role === 'ADMIN';
+    case 'AUDIT_TRAIL':
     case 'DOCUMENTATION':
       return true;
     default:
@@ -170,21 +171,27 @@ export default function App() {
 
   // Safe navigation helper that flushes pending draft changes before switching view
   const handleSafeTabChange = async (targetTab: ViewTab) => {
+    let resolvedTab = targetTab;
+    if (!isTabAuthorizedForRole(resolvedTab, currentUser?.role || 'MAKER')) {
+      showToast('Access restricted: System Health and SSOT Lakehouse are reserved for Administrator.');
+      resolvedTab = getInitialTabForRole(currentUser?.role || 'MAKER');
+    }
+
     if (editingSubmission && navigationGuardRef.current?.hasUnsavedChanges()) {
       try {
         const saved = await navigationGuardRef.current.flush();
         if (!saved) {
-          setPendingNavigationAction({ type: 'SWITCH_TAB', targetTab });
+          setPendingNavigationAction({ type: 'SWITCH_TAB', targetTab: resolvedTab });
           setLeaveSafetyModalOpen(true);
           return;
         }
       } catch (err: any) {
-        setPendingNavigationAction({ type: 'SWITCH_TAB', targetTab, errorMsg: err.message });
+        setPendingNavigationAction({ type: 'SWITCH_TAB', targetTab: resolvedTab, errorMsg: err.message });
         setLeaveSafetyModalOpen(true);
         return;
       }
     }
-    setActiveTab(targetTab);
+    setActiveTab(resolvedTab);
     setEditingSubmission(null);
   };
 
@@ -325,11 +332,15 @@ export default function App() {
         return;
       }
 
-      // 8. Ctrl+Shift+S / Cmd+Shift+S: Jump to Phase 2 SSOT
+      // 8. Ctrl+Shift+S / Cmd+Shift+S: Jump to Phase 2 SSOT (Admin Only)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        handleSafeTabChange('PHASE2_SSOT');
-        showToast('Navigated to Phase 2 SSOT Medallion Lakehouse (Ctrl+Shift+S)');
+        if (currentUser.role === 'ADMIN') {
+          handleSafeTabChange('PHASE2_SSOT');
+          showToast('Navigated to Phase 2 SSOT Medallion Lakehouse (Ctrl+Shift+S)');
+        } else {
+          showToast('Access restricted: SSOT Lakehouse is reserved for Administrator.');
+        }
         return;
       }
 
@@ -349,11 +360,15 @@ export default function App() {
         return;
       }
 
-      // 11. Ctrl+Shift+H / Cmd+Shift+H: Jump to System Health
+      // 11. Ctrl+Shift+H / Cmd+Shift+H: Jump to System Health (Admin Only)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
         e.preventDefault();
-        handleSafeTabChange('SYSTEM_HEALTH');
-        showToast('Navigated to System Health Telemetry Dashboard (Ctrl+Shift+H)');
+        if (currentUser.role === 'ADMIN') {
+          handleSafeTabChange('SYSTEM_HEALTH');
+          showToast('Navigated to System Health Telemetry Dashboard (Ctrl+Shift+H)');
+        } else {
+          showToast('Access restricted: System Health telemetry is reserved for Administrator.');
+        }
         return;
       }
     };
@@ -508,8 +523,16 @@ export default function App() {
     setEditingSubmission(null);
     setLogoutModalOpen(false);
     setIsLoggingOut(false);
+    setLogoutFlushError(null);
     try {
       localStorage.removeItem('ob_logged_in_user');
+      // Invalidate & clear sensitive transient biometric state per existing auth architecture
+      // Note: Persisted drafts in IndexedDB & submissionService remain safely preserved.
+      sessionStorage.removeItem('ob_internal_hw_diagnostic');
+      sessionStorage.removeItem('ob_biometric_challenge');
+      sessionStorage.removeItem('ob_face_auth_temp');
+      sessionStorage.removeItem('ob_active_session_token');
+      sessionStorage.removeItem('ob_auth_history_cache');
     } catch {}
     setAuthView('LOGIN');
     showToast('Logged out of Oromia Bank Regulatory Portal.');
@@ -913,16 +936,17 @@ export default function App() {
 
               {activeTab === 'NBE_SIMULATOR' && <NbeSimulatorView />}
 
-              {activeTab === 'PHASE2_SSOT' && (
+              {activeTab === 'PHASE2_SSOT' && currentUser?.role === 'ADMIN' && (
                 <Phase2SSOTView
                   templates={templates}
+                  currentUser={currentUser}
                   onOpenGeneratedSubmission={handleOpenGeneratedSubmission}
                 />
               )}
 
               {activeTab === 'AUDIT_TRAIL' && <AuditTrailView />}
 
-              {activeTab === 'SYSTEM_HEALTH' && (
+              {activeTab === 'SYSTEM_HEALTH' && currentUser?.role === 'ADMIN' && (
                 <SystemHealthDashboard currentUser={currentUser} />
               )}
 

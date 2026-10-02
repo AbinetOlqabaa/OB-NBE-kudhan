@@ -87,9 +87,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             badge: null,
           },
           {
-            id: 'PHASE2_SSOT' as ViewTab,
-            label: 'SSOT',
-            icon: Database,
+            id: 'AUDIT_TRAIL' as ViewTab,
+            label: 'Audit',
+            icon: History,
             badge: null,
           },
         ];
@@ -114,9 +114,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             badge: null,
           },
           {
-            id: 'PHASE2_SSOT' as ViewTab,
-            label: 'SSOT',
-            icon: Database,
+            id: 'DOCUMENTATION' as ViewTab,
+            label: 'Docs',
+            icon: HelpCircle,
             badge: null,
           },
         ];
@@ -136,15 +136,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             badge: null,
           },
           {
-            id: 'PHASE2_SSOT' as ViewTab,
-            label: 'SSOT',
-            icon: Database,
-            badge: null,
-          },
-          {
             id: 'AUDIT_TRAIL' as ViewTab,
             label: 'Audit',
             icon: History,
+            badge: null,
+          },
+          {
+            id: 'DOCUMENTATION' as ViewTab,
+            label: 'Docs',
+            icon: HelpCircle,
             badge: null,
           },
         ];

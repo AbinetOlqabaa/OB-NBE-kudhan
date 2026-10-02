@@ -70,7 +70,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         },
         { id: 'LIBRARY' as ViewTab, label: 'Library', icon: BookOpen },
         { id: 'NBE_SIMULATOR' as ViewTab, label: 'NBE Probe', icon: Send },
-        { id: 'PHASE2_SSOT' as ViewTab, label: 'SSOT Lake', icon: Database },
+        { id: 'AUDIT_TRAIL' as ViewTab, label: 'Audit', icon: History },
       ];
     }
 
@@ -79,7 +79,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         { id: 'AUDITOR_DASHBOARD' as ViewTab, label: 'Auditor', icon: ShieldAlert },
         { id: 'LIBRARY' as ViewTab, label: 'Library', icon: BookOpen },
         { id: 'AUDIT_TRAIL' as ViewTab, label: 'Audit', icon: History },
-        { id: 'PHASE2_SSOT' as ViewTab, label: 'SSOT Lake', icon: Database },
+        { id: 'DOCUMENTATION' as ViewTab, label: 'Docs', icon: HelpCircle },
       ];
     }
 
@@ -87,8 +87,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     return [
       { id: 'MAKER_WORKSPACE' as ViewTab, label: 'Maker', icon: FileText },
       { id: 'LIBRARY' as ViewTab, label: 'Library', icon: BookOpen },
-      { id: 'PHASE2_SSOT' as ViewTab, label: 'SSOT', icon: Database },
       { id: 'AUDIT_TRAIL' as ViewTab, label: 'Audit', icon: History },
+      { id: 'DOCUMENTATION' as ViewTab, label: 'Docs', icon: HelpCircle },
     ];
   };
 

@@ -255,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Lakehouse & GL reconcile',
       badge: null,
       shortcut: `${modKey}+⇧+S`,
-      roles: ['ADMIN', 'MAKER', 'CHECKER', 'AUDITOR'],
+      roles: ['ADMIN'],
     },
     {
       id: 'AUDIT_TRAIL' as ViewTab,
@@ -275,7 +275,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Real-time sensors & enclave telemetry',
       badge: null,
       shortcut: `${modKey}+⇧+H`,
-      roles: ['ADMIN', 'MAKER', 'CHECKER', 'NBE_OFFICER', 'AUDITOR'],
+      roles: ['ADMIN'],
     },
     {
       id: 'DOCUMENTATION' as ViewTab,
