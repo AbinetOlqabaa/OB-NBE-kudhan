@@ -692,6 +692,31 @@ class UserServiceClass {
     };
   }
 
+  /**
+   * Checks for existing fingerprint and face enrollment records in the user profile.
+   * Returns enrollment status flags and user details.
+   */
+  public checkBiometricEnrollment(emailOrUserId: string): {
+    hasFingerprint: boolean;
+    hasFace: boolean;
+    hasEnrolledBiometrics: boolean;
+    credentials: BiometricCredential[];
+    user?: UserAccount;
+  } {
+    const norm = (emailOrUserId || '').toLowerCase().trim();
+    const user = this.getByEmail(norm) || this.getById(norm);
+    const creds = user?.biometricCredentials || [];
+    const hasFingerprint = creds.some((c) => c.type === 'FINGERPRINT');
+    const hasFace = creds.some((c) => c.type === 'FACE');
+    return {
+      hasFingerprint,
+      hasFace,
+      hasEnrolledBiometrics: hasFingerprint || hasFace,
+      credentials: creds,
+      user,
+    };
+  }
+
   public updateUserStatus(
     userId: string,
     status: UserStatus,
