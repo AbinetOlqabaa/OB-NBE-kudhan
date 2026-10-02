@@ -21,6 +21,7 @@ import { exportRegulatoryReportXLSX } from '../utils/regulatoryReportXlsxExport.
 import { FieldAuditHoverTool } from './FieldAuditHoverTool.tsx';
 import { InputAccessoryView } from './InputAccessoryView.tsx';
 import { vibrate, haptics } from '../utils/haptics.ts';
+import { indexedDbStorage } from '../services/indexedDbStorage.ts';
 import {
   Save,
   Send,
@@ -38,6 +39,8 @@ import {
   FileText,
   FileCheck,
   Database,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 
 interface DynamicReportFormProps {
@@ -66,6 +69,7 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
   const [validation, setValidation] = useState<ValidationSummary | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [submitModalOpen, setSubmitModalOpen] = useState<boolean>(false);
   const [submitComment, setSubmitComment] = useState<string>('');
   const [filterQuery, setFilterQuery] = useState<string>('');
@@ -76,6 +80,28 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
   const [sessionEditsHistory, setSessionEditsHistory] = useState<
     Record<string, Array<{ timestamp: string; value: string | number; modifiedBy: string; modifiedByRole?: string }>>
   >({});
+
+  // 30-Second Periodic IndexedDB Auto-Save State
+  const AUTO_SAVE_INTERVAL_SECONDS = 30;
+  const [autoSaveCountdown, setAutoSaveCountdown] = useState<number>(AUTO_SAVE_INTERVAL_SECONDS);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+
+  const valuesRef = useRef(values);
+  const dynamicRowsRef = useRef(dynamicRows);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
+
+  useEffect(() => {
+    dynamicRowsRef.current = dynamicRows;
+  }, [dynamicRows]);
+
+  useEffect(() => {
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +224,87 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
     recalculateAndValidate(values, dynamicRows);
   }, [metadata.ReturnKey]);
 
+  // Check for newer draft in IndexedDB on mount to prevent data loss
+  useEffect(() => {
+    let isMounted = true;
+    const restoreDraftFromIndexedDB = async () => {
+      try {
+        const storedDraft = await indexedDbStorage.getDraft(submission.id);
+        if (storedDraft && storedDraft.offlineSavedAt && isMounted) {
+          const storedTime = new Date(storedDraft.offlineSavedAt).getTime();
+          const subTime = new Date(submission.updatedAt || submission.createdAt || 0).getTime();
+          if (storedTime > subTime && storedDraft.values && Object.keys(storedDraft.values).length > 0) {
+            const calculated = recalculateAndValidate(storedDraft.values, storedDraft.dynamicRows || {});
+            setValues(calculated);
+            setDynamicRows(storedDraft.dynamicRows || {});
+            const timeStr = new Date(storedDraft.offlineSavedAt).toLocaleTimeString();
+            setLastAutoSavedAt(timeStr);
+            setSaveFeedback(`Restored offline auto-saved draft from IndexedDB (${timeStr})`);
+            setTimeout(() => setSaveFeedback(null), 5000);
+          }
+        }
+      } catch (err) {
+        console.warn('[IndexedDB] Auto-save restoration check warning:', err);
+      }
+    };
+    restoreDraftFromIndexedDB();
+    return () => {
+      isMounted = false;
+    };
+  }, [submission.id]);
+
+  // Periodic Auto-Save every 30 seconds to IndexedDB
+  const performAutoSaveToIndexedDB = async () => {
+    if (isEffectiveReadOnly || !hasUnsavedChangesRef.current) return;
+    try {
+      setIsAutoSaving(true);
+      const calculated = FormulaEngine.calculateReport(metadata, valuesRef.current, dynamicRowsRef.current);
+      const draftRecord: ReportSubmission = {
+        ...submission,
+        values: calculated,
+        dynamicRows: dynamicRowsRef.current,
+        updatedAt: new Date().toISOString(),
+        offlineSavedAt: new Date().toISOString(),
+        syncStatus: 'LOCAL_DRAFT',
+        isOfflineDraft: true,
+      };
+
+      await indexedDbStorage.saveDraft(draftRecord, {
+        syncStatus: 'LOCAL_DRAFT',
+        isOffline: true,
+      });
+
+      onSave(calculated, dynamicRowsRef.current);
+      setHasUnsavedChanges(false);
+      hasUnsavedChangesRef.current = false;
+      const savedTime = new Date().toLocaleTimeString();
+      setLastAutoSavedAt(savedTime);
+      setAutoSaveCountdown(AUTO_SAVE_INTERVAL_SECONDS);
+    } catch (err) {
+      console.warn('[IndexedDB] Auto-save failed:', err);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isEffectiveReadOnly) return;
+
+    const timer = setInterval(() => {
+      setAutoSaveCountdown((prev) => {
+        if (prev <= 1) {
+          if (hasUnsavedChangesRef.current) {
+            performAutoSaveToIndexedDB();
+          }
+          return AUTO_SAVE_INTERVAL_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isEffectiveReadOnly, metadata.ReturnKey, submission.id]);
+
   // Listen for Ctrl+S or Cmd+S to save draft
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -294,30 +401,60 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
     setValues(calculated);
   };
 
-  const handleManualSave = () => {
+  const handleManualSave = async () => {
     vibrate(30);
     const calculated = recalculateAndValidate(values, dynamicRows);
     setValues(calculated);
     onSave(calculated, dynamicRows);
     setHasUnsavedChanges(false);
-    setSaveFeedback(`Draft persisted to local IndexedDB (Protected for remote NBE site visits) at ${new Date().toLocaleTimeString()}`);
+    hasUnsavedChangesRef.current = false;
+    setAutoSaveCountdown(AUTO_SAVE_INTERVAL_SECONDS);
+    const savedTime = new Date().toLocaleTimeString();
+    setLastAutoSavedAt(savedTime);
+
+    try {
+      await indexedDbStorage.saveDraft(
+        {
+          ...submission,
+          values: calculated,
+          dynamicRows,
+          updatedAt: new Date().toISOString(),
+          offlineSavedAt: new Date().toISOString(),
+          syncStatus: 'LOCAL_DRAFT',
+          isOfflineDraft: true,
+        },
+        { syncStatus: 'LOCAL_DRAFT', isOffline: true }
+      );
+    } catch (err) {
+      console.warn('[IndexedDB] Manual save to IndexedDB warning:', err);
+    }
+
+    setSaveFeedback(
+      `Draft persisted to local IndexedDB (Protected for remote NBE site visits) at ${savedTime}`
+    );
     setTimeout(() => setSaveFeedback(null), 4000);
   };
 
   const handleExportExcel = () => {
     vibrate(20);
-    exportRegulatoryReportXLSX(
-      {
-        ...submission,
-        values,
-        dynamicRows,
-        templateSnapshot: metadata,
-      },
-      {
-        officerName: currentUser.name,
-        officerRole: currentUser.role,
-      }
-    );
+    try {
+      const exportedFile = exportRegulatoryReportXLSX(
+        {
+          ...submission,
+          values,
+          dynamicRows,
+          templateSnapshot: metadata,
+        },
+        {
+          officerName: currentUser.name,
+          officerRole: currentUser.role,
+        }
+      );
+      setExportNotice(`XLSX exported for NBE offline review: ${exportedFile}`);
+      setTimeout(() => setExportNotice(null), 6000);
+    } catch (err: any) {
+      alert(`XLSX Export error: ${err?.message || 'Failed to generate Excel report'}`);
+    }
   };
 
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -385,14 +522,28 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
               <span>/</span>
               <span className="font-mono font-bold text-ob-indigo-700 dark:text-ob-indigo-400">{metadata.Code}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight leading-tight truncate max-w-md sm:max-w-xl">
                 {metadata.Title}
               </h1>
-              <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 shrink-0" title="IndexedDB persistent offline storage enabled for NBE remote site visits">
-                <Database className="w-2.5 h-2.5" />
-                IndexedDB Active
-              </span>
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 shrink-0 transition-all"
+                title="Draft data is periodically auto-saved to local IndexedDB every 30 seconds to prevent data loss"
+              >
+                <Database className={`w-3 h-3 ${isAutoSaving ? 'animate-spin text-ob-indigo-600' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                {isAutoSaving ? (
+                  <span className="font-bold text-ob-indigo-600 dark:text-ob-indigo-400">Saving to IndexedDB...</span>
+                ) : lastAutoSavedAt ? (
+                  <span>Auto-saved {lastAutoSavedAt} (every 30s)</span>
+                ) : (
+                  <span>IndexedDB Active • Auto-save (30s)</span>
+                )}
+                {hasUnsavedChanges && !isAutoSaving && (
+                  <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold ml-0.5">
+                    (in {autoSaveCountdown}s)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -414,7 +565,7 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
             type="button"
             onClick={handleExportExcel}
             className="min-h-[44px] sm:min-h-[34px] flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl sm:rounded-lg transition-colors shadow-2xs cursor-pointer touch-manipulation touch-press"
-            title="Export return to Excel XLSX"
+            title="Export return to Excel XLSX using SheetJS for offline NBE review"
           >
             <Download className="w-4 h-4 sm:w-3 sm:h-3 text-slate-500 dark:text-slate-400" />
             <span>XLSX</span>
@@ -497,6 +648,21 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
         </div>
       )}
 
+      {exportNotice && (
+        <div className="bg-ob-indigo-50 dark:bg-ob-indigo-950/60 border border-ob-indigo-300 dark:border-ob-indigo-800 text-ob-indigo-950 dark:text-ob-indigo-200 px-3 py-1.5 rounded-lg text-xs flex items-center justify-between shadow-2xs shrink-0 animate-in fade-in">
+          <div className="flex items-center gap-2 font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5 text-ob-indigo-600 dark:text-ob-indigo-400 shrink-0" />
+            <span>{exportNotice}</span>
+          </div>
+          <button
+            onClick={() => setExportNotice(null)}
+            className="text-ob-indigo-800 dark:text-ob-indigo-400 hover:text-ob-indigo-950 dark:hover:text-ob-indigo-200 font-bold text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {importNotification && (
         <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-3 py-1.5 rounded-lg text-xs flex items-center justify-between shadow-2xs shrink-0">
           <div className="flex items-center gap-2">
@@ -546,6 +712,34 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
           </div>
         )}
       </div>
+
+      {/* 3.5 Real-Time Validation Error Banner */}
+      {validation && !validation.isValid && (
+        <div className="bg-rose-50 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-900 rounded-xl px-3.5 py-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs shrink-0 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <div className="leading-tight">
+              <span className="font-bold text-rose-900 dark:text-rose-100">
+                {validation.errorsCount} Validation Error(s) Detected Before Submission
+              </span>
+              <span className="hidden sm:inline text-rose-700 dark:text-rose-300 ml-1.5">
+                • Currency format, percentage range, and mandatory field rules must be resolved.
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setItemTypeFilter(itemTypeFilter === 'ERRORS_ONLY' ? 'ALL' : 'ERRORS_ONLY')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              itemTypeFilter === 'ERRORS_ONLY'
+                ? 'bg-rose-700 text-white'
+                : 'bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+            }`}
+          >
+            {itemTypeFilter === 'ERRORS_ONLY' ? 'Showing Errors Only' : 'Filter to Errors Only'}
+          </button>
+        </div>
+      )}
 
       {/* 4. Sub-Tabs Bar (if dynamic roster exists) */}
       {metadata.DynamicItemsList.length > 0 && (
@@ -692,6 +886,7 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
                           {/* Real-time field validation error message */}
                           {fieldError && (
                             <div
+                              id={`error-${item.Code}`}
                               className={`flex items-start gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md border animate-in fade-in duration-150 ${
                                 hasError
                                   ? 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-900/80 text-rose-700 dark:text-rose-300'
@@ -700,6 +895,13 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
                             >
                               <AlertCircle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${hasError ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`} />
                               <span>{fieldError.message}</span>
+                            </div>
+                          )}
+
+                          {!fieldError && item._required && currentVal !== '' && currentVal !== undefined && (
+                            <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span>Mandatory field compliant</span>
                             </div>
                           )}
                         </div>
@@ -807,6 +1009,7 @@ export const DynamicReportForm: React.FC<DynamicReportFormProps> = ({
               area={area}
               rows={dynamicRows[area.Area] || []}
               readOnly={readOnly}
+              validation={validation}
               onAddRow={() => handleAddDynamicRow(area.Area)}
               onUpdateCell={(rowId, colCode, val) =>
                 handleUpdateDynamicCell(area.Area, rowId, colCode, val)

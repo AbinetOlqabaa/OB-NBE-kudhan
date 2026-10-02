@@ -365,6 +365,8 @@ import { runPhase18LoginFormProductionCleanupTests } from './phase18-login-form-
 import { runPhase19ContextAwareBiometricResetTests } from './phase19-context-aware-biometric-reset.test.ts';
 import { runPhase20RegulatoryReportingXlsxExportTests } from './phase20-regulatory-reporting-xlsx-export.test.ts';
 import { runPhase21RealtimeFieldLevelValidationTests } from './phase21-realtime-field-level-validation.test.ts';
+import { runPhase22XlsxSheetJsExportTests } from './phase22-xlsx-sheetjs-export.test.ts';
+import { runPhase23IndexedDbAutoSaveTests } from './phase23-indexeddb-autosave.test.ts';
 import { runXlsxExportAndDynamicValidationTests } from './xlsx-export-and-dynamic-validation.test.ts';
 
 async function runFullApplicationTestSuite() {
@@ -387,6 +389,8 @@ async function runFullApplicationTestSuite() {
   await runPhase19ContextAwareBiometricResetTests();
   await runPhase20RegulatoryReportingXlsxExportTests();
   await runPhase21RealtimeFieldLevelValidationTests();
+  await runPhase22XlsxSheetJsExportTests();
+  await runPhase23IndexedDbAutoSaveTests();
   await runXlsxExportAndDynamicValidationTests();
   await runPdfAndSnapshotTests();
   await runIndexedDbOfflineStorageTests();

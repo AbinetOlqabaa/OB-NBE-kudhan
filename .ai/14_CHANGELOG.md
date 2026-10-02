@@ -4,6 +4,36 @@ All notable changes and engineering enhancements for the Oromia Bank NBE Regulat
 
 ---
 
+## [23.0.0-phase21-22-23-dynamic-report-form-validation-xlsx-autosave] - 2026-10-02
+
+### Added & Enhanced
+- **Phase 21: Real-Time Field-Level Validation Logic (`DynamicReportForm.tsx`, `ValidationEngine.ts`, `DynamicAreaTable.tsx`, `src/tests/phase21-realtime-field-level-validation.test.ts`)**:
+  - **Currency & Precision Constraints**: Enforced 2 decimal place maximum precision on ETB currency amounts; rejected invalid formatting and non-numeric characters; enforced non-negative balance constraints for Capital, Cash, Deposit, Collateral, and Statutory Reserve accounts.
+  - **Ratio & Range Constraints**: Enforced percentage ratio range bounds (0.00% to 100.00%) with explicit range errors/warnings; enforced non-negative whole integer constraints for customer, borrower, and staff counts.
+  - **Mandatory Field Constraints**: Flagged missing required fields in real-time with descriptive regulatory warnings; rendered green `Mandatory field compliant` badges for valid inputs.
+  - **Dynamic Schedule Validation**: Propagated validation engine summaries to `DynamicAreaTable` displaying cell-level error outlines and alert tooltips across both desktop table and mobile card views.
+  - **Interactive Pre-Submission Gate**: Disabled `Submit to Checker` action with diagnostic counter and tooltips while validation errors remain; added interactive validation alert banner with 1-click error filtering (`ERRORS_ONLY`).
+  - **Automated Test Coverage**: 100% passing across all 18 assertions in `phase21-realtime-field-level-validation.test.ts`.
+
+- **Phase 22: SheetJS .xlsx Export for NBE-Compliant Offline Review (`DynamicReportForm.tsx`, `regulatoryReportXlsxExport.ts`, `excelService.ts`, `src/tests/phase22-xlsx-sheetjs-export.test.ts`)**:
+  - **NBE Multi-Sheet Workbook Generation**: Created 5-sheet statutory workbook using SheetJS (`xlsx`):
+    1. `Submission Summary`: Institutional identifiers (Oromia Bank S.C., InstCode `0000013`), return metadata, Maker & Checker 4-eyes audit trail, SHA-256 integrity seal, and Directive BSD/03/2020 citation.
+    2. `Return Items`: Fixed line items with Excel number formats (`#,##0.00`), calculation method indicators (Auto/Total/Direct Input), and validation status.
+    3. `Dynamic Schedules`: Dedicated worksheets for each dynamic area preserving borrower facilities and asset rosters.
+    4. `Validation Checklist`: Comprehensive compliance audit checklist evaluating all NBE consistency rules.
+    5. `Offline Review Sign-off`: Institutional examination record with signature lines for NBE Bank Supervision Directorate examiners and Bank Compliance Officers.
+  - **Resilient Binary Download**: Implemented Blob + `URL.createObjectURL` anchor download with graceful fallback to `XLSX.writeFile`; displayed real-time success toast with the standardized filename (`OB_NBE_${cleanKey}_FY${FinYear}_${Status}_${SubmissionId}.xlsx`).
+  - **Automated Test Coverage**: 100% passing in `phase22-xlsx-sheetjs-export.test.ts` (roundtrip binary parse and integrity verification).
+
+- **Phase 23: Periodic 30-Second IndexedDB Auto-Save (`DynamicReportForm.tsx`, `indexedDbStorage.ts`, `src/tests/phase23-indexeddb-autosave.test.ts`)**:
+  - **30-Second Interval Auto-Save**: Configured non-blocking timer in `DynamicReportForm` that automatically persists draft state to IndexedDB every 30 seconds when uncommitted Maker changes exist (`hasUnsavedChanges === true`).
+  - **Redundant Write Prevention**: Avoided unnecessary writes when form is clean or in read-only/auditor inspection mode.
+  - **Offline Durability & Mount Recovery**: Cached drafts in `indexedDbStorage` with `LOCAL_DRAFT` sync status and `offlineSavedAt` timestamp; automatically detected and restored newer offline drafts upon form mounting.
+  - **Live UI Telemetry**: Added dynamic header badge with rotating save spinner, last auto-saved timestamp (`Auto-saved at HH:MM:SS`), and live countdown (`in Ns`).
+  - **Automated Test Coverage**: 100% passing in `phase23-indexeddb-autosave.test.ts` (write verification, cadence simulation, and recovery).
+
+---
+
 ## [15.0.0-phase15-biometric-e2e-hardware-validation-acceptance] - 2026-10-01
 
 ### Added
