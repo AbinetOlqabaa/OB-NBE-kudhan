@@ -376,6 +376,8 @@ import { runPhase26PasswordAndPriorEnrollmentBiometricResetTests } from './phase
 import { runPhase26LibraryRoleBasedWorkflowsAndDeletionGovernanceTests } from './phase26-library-role-based-workflows-and-deletion-governance.test.ts';
 import { runPhase27SsotAutosavePersistenceRecoveryTests } from './phase27-ssot-autosave-persistence-recovery.test.ts';
 import { runPhase28LogoutConfirmationAndDashboardResponsibilityCleanupTests } from './phase28-logout-confirmation-and-dashboard-responsibility-cleanup.test.ts';
+import { runPhase29RememberMeEndToEndAuthenticationTests } from './phase29-remember-me-end-to-end-authentication.test.ts';
+import { runPhase30FullIntegrationSecurityRegressionAcceptanceTests } from './phase30-full-integration-security-regression-acceptance.test.ts';
 import { runXlsxExportAndDynamicValidationTests } from './xlsx-export-and-dynamic-validation.test.ts';
 
 async function runFullApplicationTestSuite() {
@@ -409,6 +411,8 @@ async function runFullApplicationTestSuite() {
   await runPhase26LibraryRoleBasedWorkflowsAndDeletionGovernanceTests();
   await runPhase27SsotAutosavePersistenceRecoveryTests();
   await runPhase28LogoutConfirmationAndDashboardResponsibilityCleanupTests();
+  await runPhase29RememberMeEndToEndAuthenticationTests();
+  await runPhase30FullIntegrationSecurityRegressionAcceptanceTests();
   await runXlsxExportAndDynamicValidationTests();
   await runPdfAndSnapshotTests();
   await runIndexedDbOfflineStorageTests();

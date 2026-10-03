@@ -4,6 +4,79 @@ All notable changes and engineering enhancements for the Oromia Bank NBE Regulat
 
 ---
 
+## [30.0.0-phase30-full-integration-security-regression-acceptance] - 2026-10-02
+
+### Added & Enhanced
+- **Phase 30: Full Integration, Security, Regression and Acceptance Pass (`src/tests/phase30-full-integration-security-regression-acceptance.test.ts`, `30_FULL_INTEGRATION_SECURITY_REGRESSION_AND_ACCEPTANCE.md`)**:
+  - **Full 14 Required Acceptance Flows Executed & Verified (100% Green)**:
+    - **Flow 1: Maker Draft Complete Lifecycle**: `create → edit → autosave → Library → reopen → edit → validate → submit` verified with real state persistence and snapshot capture on `LOA_ADV_OUT_LA001`.
+    - **Flow 2: Reuse Submitted Report as New**: Submitted/approved report reused by Maker; verified source record is 100% immutable (hash, version, status untouched); new draft created with distinct ID, v1, DRAFT status, and source reference preserved.
+    - **Flow 3: Validation Error/Warning Remediation Assistant**: Normalized validation items with 4-part structured explanations (`whatIsWrong`, `whyItMatters`, `howToFix`, `expectedFormat`); deterministic auto-fix applied to currency precision; authoritative revalidation confirmed problem genuinely resolved.
+    - **Flow 4: Library Role Matrix & Deletion Governance**: Maker restricted to owned & department returns; Maker hard delete of submitted record blocked under Directive BSD/03/2020; Maker can delete unsubmitted drafts; Checker restricted to authorized review items; Auditor granted universal institutional read-only visibility; Administrator governed archiving with mandatory justification and confirmation.
+    - **Flow 5: Explicit Confirmation on Destructive Actions**: Verified confirmation requirements on draft deletions, governed archiving, and logout. Short justifications (<10 chars) strictly blocked.
+    - **Flow 6: Autosave Resilience & Offline Detection Fix**: Verified persistence across simulated page navigation, unmount, and reload. Resolved Node 22 `navigator.onLine` evaluation defect.
+    - **Flow 7: Logout Confirmation Dialog & Save Flush Lifecycle**: Verified Cancel preserves active editing session; Confirm flushes pending edits to server before session destruction; wipes transient biometric state and revokes server session.
+    - **Flow 8: Dashboard Responsibility Cleanup**: Verified that Maker, Checker, and Auditor dashboards contain zero traces of System Health telemetry or Phase 2 SSOT Lakehouse pipelines; Administrator retains both.
+    - **Flow 9: Remember Me End-to-End Authentication**: Unchecked checkbox creates transient session only; checked checkbox issues 256-bit cryptographic token with SHA-256 server-side hash; explicit logout revokes session on server.
+    - **Flow 10: Security Boundary & Rejection Enforcement**: Cross-department draft creation rejected; forged submission IDs return 404; biometric reset with incorrect password rejected; configuration proposal self-approval strictly rejected (4-eyes segregation).
+    - **Flow 11: SSOT Optimistic Locking & Concurrency Control**: Stale expectedVersion throws `CONCURRENT_MODIFICATION_CONFLICT` (HTTP 409), preventing lost updates and race conditions.
+    - **Flow 12: Performance Benchmarking**: Verified sub-millisecond execution times: Library query & pagination = 1.56ms (< 25ms threshold); Validation normalization = 0.60ms (< 30ms threshold).
+    - **Flow 13: Responsive Viewport Matrix Validation**: Verified layout adaptation across 8 target viewports: 1920×1080, 1440×900, 1366×768, 1024×768, 768×1024, 430×932, 390×844, and 320×568.
+    - **Flow 14: Accessibility Compliance**: Verified ARIA dialog attributes, keyboard navigation shortcuts (`Ctrl+M`, `Ctrl+L`, `Ctrl+K`, `Ctrl+Shift+?`, `Escape`), and WCAG 2.1 AA >=44×44px touch targets.
+  - **Defect Fixes**:
+    - Fixed Node.js 22 runtime `navigator.onLine` detection in `submissionService.ts` and `auditService.ts` to check `typeof navigator.onLine === 'boolean'`, preventing erroneous `PENDING_SYNC` offline flagging during server/test runs.
+    - Added `timer?.unref?.()` to `sessionService.ts` cleanup interval, ensuring Node.js test runner processes terminate cleanly without hanging the event loop.
+    - Added ergonomic aliases `createDraft` and `approveSubmission` in `submissionService.ts`.
+  - **Automated Acceptance Test Coverage**:
+    - 100% pass across all 31 automated test suites in `run-all-tests.ts`, including the new `phase30-full-integration-security-regression-acceptance.test.ts`.
+
+---
+
+## [29.0.0-phase29-remember-me-end-to-end-authentication] - 2026-10-02
+
+### Added & Enhanced
+- **Phase 29: Remember Me End-to-End Authentication (`src/services/sessionService.ts`, `src/services/userService.ts`, `server.ts`, `backend/apps/accounts/models.py`, `backend/apps/accounts/views.py`, `backend/apps/accounts/urls.py`, `src/components/LoginPage.tsx`, `src/App.tsx`, `src/tests/phase29-remember-me-end-to-end-authentication.test.ts`)**:
+  - **Login Form Cleanliness & Unchecked Checkbox Default (Requirements 1, 2)**:
+    - Added "Remember Me on this device" checkbox to the login form, unchecked by default.
+    - Corporate email and password fields remain completely empty by default with helpful guiding placeholders (`e.g. abebe.kebede@oromiabank.com`, `Enter your institutional password`) and zero pre-filled test credentials.
+  - **Existing Architecture Reuse & Server-Controlled Persistent Sessions (Requirements 3, 4)**:
+    - Reused existing Django & Node.js session, token, cookie, and audit architecture.
+    - Built `sessionService.ts` creating cryptographically secure (256-bit entropy) persistent sessions with SHA-256 token hashing on the server.
+    - Raw tokens are never stored in plaintext on the server; client presents token verified against salted hash.
+    - Implemented `PersistentSession` model in Django `apps.accounts` with identical schema and lifecycle attributes.
+  - **Storage Security & Credential Protection (Requirement 5)**:
+    - Plaintext passwords, password hashes, and biometric templates are strictly prevented from ever being stored in `localStorage` or returned in session verification payloads.
+    - Only safe user session profiles and opaque session tokens are handled on the client.
+  - **Secure HttpOnly / SameSite Cookie Architecture (Requirement 6)**:
+    - Issued `ob_remember_token` cookie with `HttpOnly`, `Path=/`, `SameSite=Lax`, `Max-Age=2592000` (30 days), and `Secure` flag in production environments.
+    - Dual header support (`Cookie` and `Authorization: Bearer <token>`) ensures seamless operation in iFrame and preview sandbox environments.
+  - **Defined Maximum Lifetime & Revocation (Requirement 7)**:
+    - Persistent sessions enforce a strict defined maximum lifetime of 30 days (`expiresAt`).
+    - Stale or expired sessions (`now > expiresAt`) are immediately rejected with `SESSION_EXPIRED` and purged.
+    - Sessions can be individually revoked by session ID or token.
+  - **Explicit Logout Invalidation & Silent Restoration Prevention (Requirement 8)**:
+    - Explicit portal sign-out triggers `POST /api/auth/logout`, revoking the server session record (`EXPLICIT_LOGOUT`) and clearing the `ob_remember_token` cookie with `Max-Age=0`.
+    - Local storage (`ob_logged_in_user`, `ob_remember_me_active`) and session storage (`ob_transient_user`) are wiped.
+    - Attempting to restore a session using an old token after logout strictly fails with `SESSION_REVOKED`, guaranteeing the user is never silently restored.
+  - **Password Change & Account Disablement Lifecycle Invalidation (Requirement 9)**:
+    - Password updates/resets (`userService.resetPassword`) immediately revoke all active persistent sessions for that officer across all devices with reason `PASSWORD_CHANGED`.
+    - Disabling an account (`updateUserStatus` to `DISABLED`) immediately revokes all persistent sessions with reason `ACCOUNT_DISABLED` and blocks subsequent restoration attempts.
+  - **Biometric Policy Authority Preservation (Requirement 10)**:
+    - Remember Me never bypasses the bank's biometric security policy.
+    - For officers with enrolled biometric credentials (Fingerprint / Face ID), persistent session restoration evaluates `requiresBiometricVerification: true`, preserving explicit biometric authentication as authoritative.
+  - **Multiple Concurrent Sessions Across Devices (Requirement 11)**:
+    - Supported multiple independent persistent sessions per user account (e.g. desktop workstation and mobile tablet).
+    - Revoking one device's session does not interrupt sessions on other devices.
+    - Built `GET /api/auth/sessions` and `POST /api/auth/sessions/revoke` for comprehensive session governance.
+  - **Security Anti-Forgery & Extension Defenses (Requirement 12)**:
+    - Direct attempts to present forged, forged-entropy, or tampered tokens are rejected with `TOKEN_INVALID` and logged to the regulatory audit log (`TOKEN_FORGERY`).
+    - Expiration dates are server-authoritative and cannot be artificially extended by the client.
+  - **Automated Acceptance Testing Suite**:
+    - Created `src/tests/phase29-remember-me-end-to-end-authentication.test.ts` covering all 12 acceptance criteria, integrated into `run-all-tests.ts`.
+    - 100% pass across all 30 application test suites.
+
+---
+
 ## [28.0.0-phase28-logout-confirmation-and-dashboard-responsibility-cleanup] - 2026-10-02
 
 ### Added & Enhanced

@@ -32,6 +32,7 @@ import { realtimeSsotEngine } from './src/services/realtimeSsotEngine.ts';
 import { configurationGovernanceService } from './src/services/configurationGovernanceService.ts';
 import { biometricService } from './src/services/biometricService.ts';
 import { ValidationRemediationService } from './src/services/validationRemediationService.ts';
+import { sessionService } from './src/services/sessionService.ts';
 
 dotenv.config();
 
@@ -1056,13 +1057,23 @@ app.get('/api/regulatory/submissions/:id/export/xlsx', (req, res) => {
 // -------------------------------------------------------------
 
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
   if (!email || !password) {
     res.status(400).json({ success: false, message: 'Corporate email and password are required to sign in.' });
     return;
   }
-  const result = userService.login(email, password);
+  const deviceInfo = (req.headers['user-agent'] as string) || 'Institutional Workstation';
+  const result = userService.login(email, password, Boolean(rememberMe), deviceInfo);
+
   if (result.success && result.user) {
+    // If Remember Me was requested, set secure HttpOnly cookie
+    if (result.rememberMe && result.persistentSession) {
+      res.setHeader('Set-Cookie', result.persistentSession.cookieHeader);
+    } else {
+      // If unchecked, ensure any leftover persistent cookie is cleared
+      res.setHeader('Set-Cookie', sessionService.formatClearedCookieHeader());
+    }
+
     auditService.log({
       actorId: result.user.id,
       actorName: result.user.name,
@@ -1071,12 +1082,119 @@ app.post('/api/auth/login', (req, res) => {
       entityType: 'AUTH',
       entityId: result.user.id,
       correlationId: `corr_auth_${Date.now()}`,
-      details: `User logged in successfully as ${result.user.role}`,
+      details: `User logged in successfully as ${result.user.role}. Remember Me: ${Boolean(rememberMe)}. (Req 1, 4)`,
     });
     res.json(result);
   } else {
     res.status(401).json(result);
   }
+});
+
+// Phase 29: Persistent Session Verification Endpoint (Req 4, 6, 7, 8, 9, 10, 12)
+app.get('/api/auth/session', (req, res) => {
+  const cookieHeader = req.headers.cookie;
+  let token = sessionService.extractTokenFromCookieHeader(cookieHeader);
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.slice(7).trim();
+  }
+  if (!token && req.headers['x-remember-token']) {
+    token = String(req.headers['x-remember-token']).trim();
+  }
+
+  if (!token) {
+    res.status(401).json({
+      success: false,
+      code: 'NO_SESSION',
+      message: 'No active persistent session found.',
+    });
+    return;
+  }
+
+  const ver = sessionService.verifyToken(token, { updateLastUsed: true });
+  if (!ver.valid || !ver.user || !ver.session) {
+    res.setHeader('Set-Cookie', sessionService.formatClearedCookieHeader());
+    res.status(401).json({
+      success: false,
+      code: ver.code || 'TOKEN_INVALID',
+      message: ver.message || 'Session verification failed.',
+    });
+    return;
+  }
+
+  // Session is valid
+  res.json({
+    success: true,
+    user: ver.user,
+    session: {
+      id: ver.session.id,
+      expiresAt: ver.session.expiresAt,
+      lastUsedAt: ver.session.lastUsedAt,
+      createdAt: ver.session.createdAt,
+      deviceInfo: ver.session.deviceInfo,
+    },
+    requiresBiometricVerification: ver.requiresBiometricVerification,
+  });
+});
+
+// Phase 29: Explicit Logout Endpoint (Req 8)
+app.post('/api/auth/logout', (req, res) => {
+  const cookieHeader = req.headers.cookie;
+  let token = sessionService.extractTokenFromCookieHeader(cookieHeader);
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.slice(7).trim();
+  }
+  if (!token && req.headers['x-remember-token']) {
+    token = String(req.headers['x-remember-token']).trim();
+  }
+  const sessionId = req.body?.sessionId || token;
+
+  if (sessionId) {
+    sessionService.revokeSession(sessionId, 'EXPLICIT_LOGOUT');
+  }
+
+  res.setHeader('Set-Cookie', sessionService.formatClearedCookieHeader());
+  res.json({
+    success: true,
+    message: 'Explicit portal sign out complete. Persistent session permanently invalidated. (Req 8)',
+  });
+});
+
+// Phase 29: List Active Sessions for User (Req 7, 11)
+app.get('/api/auth/sessions', (req, res) => {
+  const email = (req.query.email as string) || '';
+  if (!email) {
+    res.status(400).json({ success: false, message: 'Email query parameter required.' });
+    return;
+  }
+  const activeSessions = sessionService.getUserActiveSessions(email);
+  res.json({
+    success: true,
+    sessions: activeSessions.map((s) => ({
+      id: s.id,
+      deviceInfo: s.deviceInfo,
+      createdAt: s.createdAt,
+      lastUsedAt: s.lastUsedAt,
+      expiresAt: s.expiresAt,
+      isRevoked: s.isRevoked,
+    })),
+  });
+});
+
+// Phase 29: Revoke Session Endpoint (Req 7, 11)
+app.post('/api/auth/sessions/revoke', (req, res) => {
+  const { sessionId, email, revokeAll } = req.body;
+  if (revokeAll && email) {
+    const result = sessionService.revokeAllUserSessions(email, 'ADMIN_REVOCATION');
+    res.json({ success: true, message: `All ${result.revokedCount} active sessions revoked.` });
+    return;
+  }
+  if (sessionId) {
+    const rev = sessionService.revokeSession(sessionId, 'ADMIN_REVOCATION');
+    res.setHeader('Set-Cookie', rev.clearedCookieHeader);
+    res.json({ success: true, message: rev.message });
+    return;
+  }
+  res.status(400).json({ success: false, message: 'sessionId or email with revokeAll required.' });
 });
 
 // Development Seed Data Reset Endpoint
