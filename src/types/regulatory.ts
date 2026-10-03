@@ -140,6 +140,19 @@ export interface SubmissionSnapshot {
   nbeReferenceNumber?: string;
 }
 
+export interface ReviewerAssignment {
+  checkerId: string;
+  checkerName: string;
+  checkerEmail?: string;
+  checkerDepartment?: string;
+  assignedAt: string;
+  isPrimary?: boolean;
+  status?: 'PENDING' | 'ACCEPTED' | 'REVIEWED' | 'SUPERSEDED';
+  openedAt?: string;
+  reviewedAt?: string;
+  notes?: string;
+}
+
 export interface ReportSubmission {
   id: string;
   reportKey: string;
@@ -180,6 +193,9 @@ export interface ReportSubmission {
   checkerName?: string;
   checkerEmail?: string;
   checkerDepartment?: string;
+  assignedCheckerIds?: string[];
+  reviewerAssignments?: ReviewerAssignment[];
+  primaryCheckerId?: string;
   comments: SubmissionComment[];
   deliveryAttempts: DeliveryAttempt[];
   createdAt: string;
@@ -351,9 +367,9 @@ export interface SubmissionComment {
   userName: string;
   userRole: "MAKER" | "CHECKER" | "ADMIN" | "AUDITOR";
   comment: string;
-  action: "SUBMIT" | "APPROVE" | "REJECT" | "REQUEST_CORRECTION" | "SAVE_DRAFT" | "NOTE" | "COMMENT" | "FLAG" | "ARCHIVED" | "VOIDED";
+  action: "SUBMIT" | "APPROVE" | "REJECT" | "REQUEST_CORRECTION" | "SAVE_DRAFT" | "NOTE" | "COMMENT" | "FLAG" | "ARCHIVED" | "VOIDED" | "ASSIGN_CHECKER" | "ACCEPT_REVIEW";
   timestamp: string;
-  category?: 'GENERAL' | 'AUDIT' | 'CHECKER_QUERY' | 'CORRECTION_NOTE';
+  category?: 'GENERAL' | 'AUDIT' | 'CHECKER_QUERY' | 'CORRECTION_NOTE' | 'ASSIGNMENT_NOTE';
 }
 
 export interface DeliveryAttempt {
