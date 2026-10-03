@@ -34,6 +34,7 @@ import { biometricService } from './src/services/biometricService.ts';
 import { ValidationRemediationService } from './src/services/validationRemediationService.ts';
 import { sessionService } from './src/services/sessionService.ts';
 import { nbeReportPackageService } from './src/services/nbeReportPackageNormalizer.ts';
+import { nbeEndpointRegistry } from './src/services/nbeEndpointRegistry.ts';
 
 dotenv.config();
 
@@ -386,6 +387,60 @@ app.get('/api/config/nbe-package/artifacts/:hash', (req, res) => {
       return;
     }
     res.json(artifact);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// DYNAMIC NBE API ENDPOINT REGISTRY (Phase 32)
+// ============================================================================
+
+// List all configured report endpoints
+app.get('/api/config/nbe-endpoints', (req, res) => {
+  try {
+    const activeOnly = req.query.activeOnly === 'true';
+    const endpoints = nbeEndpointRegistry.getAllEndpoints({ activeOnly });
+    res.json(endpoints);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get endpoint configuration for a specific report
+app.get('/api/config/nbe-endpoints/:key', (req, res) => {
+  try {
+    const endpoint = nbeEndpointRegistry.getEndpointForReport(req.params.key);
+    res.json(endpoint);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin updates endpoint configuration for a report
+app.put('/api/config/nbe-endpoints/:key', (req, res) => {
+  const actor = req.body.actor || { id: 'usr_admin', name: 'Compliance Administrator', role: 'ADMIN' };
+  if (!actor || actor.role !== 'ADMIN') {
+    res.status(403).json({
+      error: 'Forbidden: Administrator role is required to modify NBE API integration endpoint.',
+      code: 'UNAUTHORIZED_ACCESS',
+    });
+    return;
+  }
+
+  try {
+    const updated = nbeEndpointRegistry.updateReportEndpoint(req.params.key, req.body.integration || req.body, actor);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// List managed authentication profile references (zero secret material exposed)
+app.get('/api/config/nbe-auth-profiles', (req, res) => {
+  try {
+    const profiles = nbeEndpointRegistry.getAuthProfiles();
+    res.json(profiles);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2458,6 +2513,66 @@ app.post(['/api/audit/reports/export', '/api/v1/audit/reports/export'], (req, re
 // -------------------------------------------------------------
 
 const DJANGO_SIMULATOR_URL = process.env.NBE_SIMULATOR_URL || 'http://127.0.0.1:8001/api/v1/nbe-simulator';
+
+// Dynamic Report Discovery for NBE Simulator (Phase 32)
+// Discovers all active and draft reports dynamically from SSOT, filtering retired reports
+app.get('/api/nbe-simulator/reports', (req, res) => {
+  const actorRole = (req.headers['x-actor-role'] || req.query.role || 'ADMIN') as string;
+  if (actorRole && actorRole !== 'ADMIN') {
+    res.status(403).json({
+      error: 'Forbidden: NBE Simulator access is strictly restricted to Administrators.',
+      code: 'UNAUTHORIZED_SIMULATOR_ACCESS',
+    });
+    return;
+  }
+  try {
+    const reports = nbeSimulator.getAvailableReports();
+    res.json(reports);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Build canonical simulated payload from active/draft template
+app.get('/api/nbe-simulator/reports/:key/payload', (req, res) => {
+  const actorRole = (req.headers['x-actor-role'] || req.query.role || 'ADMIN') as string;
+  if (actorRole && actorRole !== 'ADMIN') {
+    res.status(403).json({
+      error: 'Forbidden: NBE Simulator access is strictly restricted to Administrators.',
+      code: 'UNAUTHORIZED_SIMULATOR_ACCESS',
+    });
+    return;
+  }
+  try {
+    const versionNum = req.query.version ? parseInt(req.query.version as string, 10) : undefined;
+    const payload = nbeSimulator.buildSimulatedPayload(req.params.key, versionNum);
+    res.json(payload);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Dynamic simulated transmission for any report
+app.post('/api/nbe-simulator/reports/:key/transmit', async (req, res) => {
+  const actorRole = (req.headers['x-actor-role'] || req.body.role || req.body.actor?.role || 'ADMIN') as string;
+  if (actorRole && actorRole !== 'ADMIN') {
+    res.status(403).json({
+      error: 'Forbidden: NBE Simulator transmission is strictly restricted to Administrators.',
+      code: 'UNAUTHORIZED_SIMULATOR_ACCESS',
+    });
+    return;
+  }
+  try {
+    const result = await nbeSimulator.simulateReportTransmission(req.params.key, {
+      customPayload: req.body.payload,
+      scenarioOverride: req.body.scenario,
+      idempotencyKey: req.body.idempotencyKey,
+    });
+    res.status(result.statusCode).json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 app.get('/api/nbe-simulator/submissions', async (req, res) => {
   const { page, page_size, limit } = req.query as any;

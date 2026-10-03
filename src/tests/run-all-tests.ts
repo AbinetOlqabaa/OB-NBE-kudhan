@@ -379,6 +379,7 @@ import { runPhase28LogoutConfirmationAndDashboardResponsibilityCleanupTests } fr
 import { runPhase29RememberMeEndToEndAuthenticationTests } from './phase29-remember-me-end-to-end-authentication.test.ts';
 import { runPhase30FullIntegrationSecurityRegressionAcceptanceTests } from './phase30-full-integration-security-regression-acceptance.test.ts';
 import { runPhase31NbeJsonReportPackageImportAndSchemaNormalizationTests } from './phase31-nbe-json-report-package-import-and-schema-normalization.test.ts';
+import { runPhase32DynamicNbeApiEndpointRegistryAndSimulatorIntegrationTests } from './phase32-dynamic-nbe-api-endpoint-registry-and-simulator-integration.test.ts';
 import { runXlsxExportAndDynamicValidationTests } from './xlsx-export-and-dynamic-validation.test.ts';
 
 async function runFullApplicationTestSuite() {
@@ -415,6 +416,7 @@ async function runFullApplicationTestSuite() {
   await runPhase29RememberMeEndToEndAuthenticationTests();
   await runPhase30FullIntegrationSecurityRegressionAcceptanceTests();
   await runPhase31NbeJsonReportPackageImportAndSchemaNormalizationTests();
+  await runPhase32DynamicNbeApiEndpointRegistryAndSimulatorIntegrationTests();
   await runXlsxExportAndDynamicValidationTests();
   await runPdfAndSnapshotTests();
   await runIndexedDbOfflineStorageTests();

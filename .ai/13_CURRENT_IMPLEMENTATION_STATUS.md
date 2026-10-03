@@ -785,10 +785,11 @@ Phase 1 of the visual design system and color standardization cycle has been com
 | **GATE-29** | Remember Me Authentication | Secure 30-day token, HttpOnly/SameSite cookie, unselected by default, zero password persistence, instant revocation on logout/password change/disablement | **PASS** | `phase29-remember-me-end-to-end-authentication.test.ts` (100% pass) |
 | **GATE-30** | Full Integration & Security Acceptance | Comprehensive end-to-end regression and multi-role boundary enforcement | **PASS** | `phase30-full-integration-security-regression-acceptance.test.ts` (100% pass) |
 | **GATE-31** | NBE JSON Report Package Import | Admin-only import workflow, validation drawer, sample-value stripping, SHA-256 hash preservation, SSOT DRAFT creation, zero auto-publish, backward-compatible with 24 legacy returns | **PASS** | `phase31-nbe-json-report-package-import-and-schema-normalization.test.ts` (100% pass) |
+| **GATE-32** | Dynamic NBE API Endpoint Registry & Simulator | Dynamic report endpoint resolution, per-report URL/method/timeout/idempotency/auth-profile governance, managed secretless auth profiles (HSM/Vault/Simulator), live simulator discovery of active & draft reports, dynamic payload generation, retired report exclusion, production safety guardrail, and Admin-only authorization | **PASS** | `phase32-dynamic-nbe-api-endpoint-registry-and-simulator-integration.test.ts` (100% pass) |
 
 ---
 
-## 5. Phase 29 & 31 Acceptance Verification Summary
+## 5. Phase 29, 31 & 32 Acceptance Verification Summary
 
 ### Phase 29: Remember Me End-to-End Authentication
 - **Default State**: Checkbox is strictly unchecked by default; email and password fields are clean.
@@ -809,6 +810,21 @@ Phase 1 of the visual design system and color standardization cycle has been com
   - `POST /api/config/nbe-package/validate` (200 OK)
   - `POST /api/config/nbe-package/import` (201 Created for Admin, 403 Forbidden for Maker/Checker)
   - `GET /api/config/nbe-package/artifacts` & `GET /api/config/nbe-package/artifacts/:hash`
+
+### Phase 32: Dynamic NBE API Endpoint Registry & Simulator Integration
+- **Dynamic Endpoint Registry (`nbeEndpointRegistry.ts`)**: Governs per-report endpoint URL, environment target (`LOCAL/SIMULATOR`, `TEST/NBE TEST`, `PRODUCTION/NBE`), HTTP method (`POST`/`PUT`), timeout, content-type, idempotency strategy (`HEADER_UUID`/`HASH_SHA256`), and managed authentication profile reference.
+- **Managed Secretless Auth Profiles**: Predefined profiles for Local Sandbox, NBE Testbed Vault, and Production HSM. Zero private keys, passwords, or client secrets are exposed to client UI or return definitions.
+- **Dynamic Simulator Discovery (`nbeSimulator.ts`)**: Automatically discovers newly imported and existing reports directly from SSOT definitions without requiring simulator code changes.
+- **Dynamic Payload Synthesizer**: Generates canonical submission payloads matching active or draft schemas while respecting data types (`NUMERIC`, `DATE`, `TEXT`) and explicit structural defaults.
+- **Lifecycle & Retirement Hygiene**: `RETIRED` reports are dynamically excluded from active simulator selection while historical submissions remain preserved.
+- **Transmission Guardrails (`nbeAdapter.ts`)**: Prevents unauthorized production routing (`403 Forbidden` with `PRODUCTION_TRANSMISSION_BLOCKED` when disabled); supports custom idempotency key headers and cryptographic payload hashing.
+- **Admin-Only RBAC**: Simulator inspection and endpoint configuration are restricted to Admin role; unauthorized roles receive HTTP `403 Forbidden`.
+- **Live HTTP Simulator Endpoints**:
+  - `GET /api/nbe-simulator/reports` (Discovers active & draft reports)
+  - `GET /api/nbe-simulator/reports/:key/payload` (Generates dynamic template payload)
+  - `POST /api/nbe-simulator/reports/:key/transmit` (Executes simulated report submission and generates digital receipt)
+  - `GET /api/config/nbe-endpoints` & `GET /api/config/nbe-auth-profiles`
+
 
 
 

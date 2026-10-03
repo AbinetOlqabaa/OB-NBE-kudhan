@@ -1086,4 +1086,13 @@ All notable changes and engineering enhancements for the Oromia Bank NBE Regulat
   - Interactive Admin UI component `src/components/NbeReportPackageImportModal.tsx` embedded in `AdminDashboard.tsx` and `ReportTemplateStudioModal.tsx`.
   - Express API routes: `POST /api/config/nbe-package/validate`, `POST /api/config/nbe-package/import`, `GET /api/config/nbe-package/artifacts`, `GET /api/config/nbe-package/artifacts/:hash`.
   - Test suite: `src/tests/phase31-nbe-json-report-package-import-and-schema-normalization.test.ts` (100% pass across all 15 acceptance gates).
+- **Phase 32: Dynamic NBE API Endpoint Registry & Simulator Integration**:
+  - Dynamic Endpoint Registry service in `src/services/nbeEndpointRegistry.ts` managing per-report URL, HTTP method, timeout, environment target, and auth profiles.
+  - Managed Secretless Auth Profiles (`MANAGED_AUTH_PROFILES`) representing Local Simulator, NBE Testbed Vault, and Production HSM with zero plaintext credentials or private keys in client storage.
+  - Dynamic Simulator Discovery in `src/services/nbeSimulator.ts` discovering new reports and generating canonical submission payloads on-the-fly without hardcoded report lists.
+  - Dynamic Gateway Adapter in `src/services/nbeAdapter.ts` routing submissions to report-specific endpoints with production transmission guardrails (`PRODUCTION_TRANSMISSION_BLOCKED`) and custom idempotency key support (`HEADER_UUID`, `HASH_SHA256`).
+  - Simulator View UI (`src/components/NbeSimulatorView.tsx`) with report selector, live template payload inspector, endpoint metadata display, scenario injection, and instant transmission tester.
+  - Express API routes: `GET /api/nbe-simulator/reports`, `GET /api/nbe-simulator/reports/:key/payload`, `POST /api/nbe-simulator/reports/:key/transmit`, `GET /api/config/nbe-endpoints`, `GET /api/config/nbe-auth-profiles`.
+  - Test suite: `src/tests/phase32-dynamic-nbe-api-endpoint-registry-and-simulator-integration.test.ts` (100% pass across all acceptance gates).
+
 

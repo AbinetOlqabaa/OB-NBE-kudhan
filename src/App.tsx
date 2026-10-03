@@ -90,7 +90,7 @@ export const isTabAuthorizedForRole = (tab: ViewTab, role?: string): boolean => 
     case 'AUDITOR_DASHBOARD':
       return role === 'ADMIN' || role === 'AUDITOR';
     case 'NBE_SIMULATOR':
-      return role === 'ADMIN' || role === 'CHECKER';
+      return role === 'ADMIN';
     case 'PHASE2_SSOT':
     case 'SYSTEM_HEALTH':
       return role === 'ADMIN';

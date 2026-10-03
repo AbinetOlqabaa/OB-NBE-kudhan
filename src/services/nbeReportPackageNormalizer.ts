@@ -16,6 +16,7 @@ import {
   type VersionStatus,
 } from './configService.ts';
 import { auditService } from './auditService.ts';
+import { nbeEndpointRegistry, type ReportIntegrationConfigSSOT } from './nbeEndpointRegistry.ts';
 
 // ============================================================================
 // 1. DATA CONTRACTS & INTERFACES (Phase 31 Specification)
@@ -106,6 +107,8 @@ export interface NbeIntegrationConfigInput {
   contentType?: string;
   authenticationProfile?: string;
   timeoutMs?: number;
+  idempotencyStrategy?: string;
+  [key: string]: any;
 }
 
 export interface NbeReportPackageReportSection {
@@ -984,6 +987,31 @@ export class NbeReportPackageServiceClass {
       finalVersion = created.version;
     }
 
+    // Register integration endpoint with NBE Endpoint Registry (Phase 32)
+    const integToRegister =
+      (draftVersion as any).integrationConfig ||
+      (draftReport as any).integrationConfig ||
+      draftReport.displayConfiguration?.integration;
+    if (integToRegister) {
+      try {
+        nbeEndpointRegistry.updateReportEndpoint(
+          returnKey,
+          {
+            reportKey: returnKey,
+            versionNumber: finalVersion.versionNumber,
+            endpointUrl: integToRegister.endpointUrl || integToRegister.apiEndpoint || '/api/v1/nbe-simulator/submit',
+            httpMethod: integToRegister.httpMethod || 'POST',
+            contentType: integToRegister.contentType || 'application/json',
+            timeoutMs: integToRegister.timeoutMs || 30000,
+            authProfileRef: integToRegister.authProfileRef || integToRegister.authenticationProfile || 'auth_local_simulator',
+            environmentTarget: integToRegister.environmentTarget ||
+              ((integToRegister.endpointUrl?.startsWith('https://') || integToRegister.apiEndpoint?.startsWith('https://')) ? 'PRODUCTION/NBE' : 'LOCAL/SIMULATOR'),
+          },
+          actor
+        );
+      } catch {}
+    }
+
     // 3. Store Original Imported Package as Canonical Auditable Artifact (Req 11, 12)
     const rawText = typeof rawJson === 'string' ? rawJson : JSON.stringify(rawJson, null, 2);
     const artifact: NbeImportedArtifact = {
@@ -1295,6 +1323,26 @@ export class NbeReportPackageServiceClass {
       },
     };
 
+    const integrationConfig: ReportIntegrationConfigSSOT | undefined = integration
+      ? {
+          reportKey: returnKey,
+          versionNumber: 1,
+          environmentTarget: (integration.apiEndpoint && integration.apiEndpoint.startsWith('https://')) ? 'PRODUCTION/NBE' : 'LOCAL/SIMULATOR',
+          endpointUrl: integration.apiEndpoint || '/api/v1/nbe-simulator/submit',
+          httpMethod: (integration.httpMethod === 'PUT' ? 'PUT' : 'POST'),
+          contentType: integration.contentType || 'application/json',
+          expectedResponseType: 'application/json',
+          timeoutMs: integration.timeoutMs || 30000,
+          nbeReportIdentifier: `NBE_RET_${returnKey}`,
+          idempotencyStrategy: (integration.idempotencyStrategy as any) || 'HEADER_UUID',
+          authProfileRef: integration.authenticationProfile || 'auth_local_simulator',
+          productionEnabled: false,
+          updatedAt: now,
+        }
+      : undefined;
+
+    (version as any).integrationConfig = integrationConfig;
+
     const report: ReportDefinitionSSOT = {
       id: `rep_${returnKey}`,
       returnKey,
@@ -1326,6 +1374,7 @@ export class NbeReportPackageServiceClass {
       createdAt: now,
       updatedAt: now,
       activeVersionSnapshot: undefined, // Strictly undefined while in DRAFT!
+      integrationConfig,
     };
 
     return { report, version };

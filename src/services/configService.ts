@@ -126,6 +126,7 @@ export interface ReportVersionSSOT {
     ReturnItemsList: any[];
     DynamicItemsList: any[];
   };
+  integrationConfig?: any;
 }
 
 export interface ReportDefinitionSSOT {
@@ -149,6 +150,7 @@ export interface ReportDefinitionSSOT {
   createdAt: string;
   updatedAt: string;
   activeVersionSnapshot?: ReportVersionSSOT;
+  integrationConfig?: any;
 }
 
 /**
@@ -205,6 +207,7 @@ export function versionToReportMetadata(
     SourceFilename: `${def.returnKey}_v${version.versionNumber}.json`,
     SourceHash: `sha256-v${version.versionNumber}-${Date.now()}`,
     isCustom: true,
+    integrationConfig: (version as any).integrationConfig || (def as any).integrationConfig || def.displayConfiguration?.integration,
   };
 }
 
@@ -1373,6 +1376,10 @@ class ConfigurationEngine {
     return list;
   }
 
+  public getReportDefinitions(filter?: { category?: string; frequency?: string; status?: string; departmentId?: string }): ReportDefinitionSSOT[] {
+    return this.getReports(filter);
+  }
+
   public getReportDefinition(returnKey: string): ReportDefinitionSSOT | null {
     const report = this.reports.get(returnKey);
     if (!report) return null;
@@ -2078,6 +2085,10 @@ class ConfigurationEngine {
   /**
    * Safely retires an obsolete report return template while preserving historical audit trails.
    */
+  public retireReportDefinition(returnKey: string, actor: ActorInfo, reason?: string): ReportDefinitionSSOT {
+    return this.retireReport(returnKey, actor, reason);
+  }
+
   public retireReport(returnKey: string, actor: ActorInfo, reason?: string): ReportDefinitionSSOT {
     const report = this.reports.get(returnKey);
     if (!report) throw new Error(`Report with ReturnKey '${returnKey}' not found.`);

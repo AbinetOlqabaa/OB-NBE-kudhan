@@ -107,6 +107,7 @@ export interface ReportMetadata {
   SourceFilename: string;
   SourceHash: string;
   isCustom?: boolean;
+  integrationConfig?: any;
 }
 
 export interface ReportValueRecord {

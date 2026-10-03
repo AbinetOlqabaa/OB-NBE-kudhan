@@ -245,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Intake console & test probe',
       badge: null,
       shortcut: `${modKey}+⇧+N`,
-      roles: ['ADMIN', 'CHECKER'],
+      roles: ['ADMIN'],
     },
     {
       id: 'PHASE2_SSOT' as ViewTab,
