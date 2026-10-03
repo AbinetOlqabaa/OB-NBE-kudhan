@@ -44,7 +44,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+
+function resolveServerPort(): number {
+  if (process.env.APP_PORT) {
+    const parsed = parseInt(process.env.APP_PORT, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const parsed = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  if (process.env.DEFAULT_APP_PORT) {
+    const parsed = parseInt(process.env.DEFAULT_APP_PORT, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // AI Studio environment (both development and deployed preview revisions) uses Nginx on port 8080
+  // proxying to localhost:3000. The Node application must always bind to port 3000.
+  return 3000;
+}
+
+const PORT = resolveServerPort();
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -3164,9 +3187,7 @@ const healthHandler = (_req: express.Request, res: express.Response) => {
     timestamp: new Date().toISOString(),
   });
 };
-app.get('/api/health', healthHandler);
-app.get('/health', healthHandler);
-app.get('/healthz', healthHandler);
+app.get(['/api/health', '/health', '/healthz', '/_ah/health', '/healthcheck'], healthHandler);
 
 // -------------------------------------------------------------
 // DEV / PROD SERVER BOOTSTRAP
@@ -3231,11 +3252,43 @@ async function startServer() {
   }
 
   const server = http.createServer(app);
+  let isListening = false;
+
+  server.on('error', (err: any) => {
+    console.error('[Server Error]', err);
+    if (err.code === 'EADDRINUSE' && !isListening && PORT !== 3000) {
+      console.warn(`[Server Warning] Port ${PORT} already bound; falling back to port 3000...`);
+      server.listen(3000, '0.0.0.0', () => {
+        isListening = true;
+        console.log(`[Oromia Bank NBE Platform] Server listening on fallback port 3000`);
+      });
+    }
+  });
+
   realtimeSsotEngine.attachServer(server, '/ws/ssot');
 
   server.listen(PORT, '0.0.0.0', () => {
+    isListening = true;
     console.log(`[Oromia Bank NBE Platform] Server listening on port ${PORT}`);
   });
+
+  // Graceful shutdown handling for Cloud Run container lifecycle
+  const handleShutdown = (signal: string) => {
+    console.log(`[Server] Received ${signal}, closing HTTP server...`);
+    server.close(() => {
+      console.log('[Server] HTTP server closed cleanly.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(0);
+    }, 5000).unref();
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('[Server Fatal Error on Startup]', err);
+  process.exit(1);
+});
