@@ -1274,7 +1274,7 @@ class EffectiveAccessEngineClass {
     getAllReports().forEach((r) => reportsMap.set(r.ReturnKey, r));
     try {
       configService.getReports().forEach((r) => {
-        if (!reportsMap.has(r.returnKey)) {
+        if (r.status === 'ACTIVE' && !reportsMap.has(r.returnKey)) {
           reportsMap.set(r.returnKey, {
             ReturnKey: r.returnKey,
             Code: r.code || r.returnKey,

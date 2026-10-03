@@ -782,5 +782,33 @@ Phase 1 of the visual design system and color standardization cycle has been com
 | **GATE-11** | Responsive Layout | Tested on 9 viewports (320px to 1920px), zero horizontal overflow, mobile swipe navigation | **PASS** | Responsive UI test suite |
 | **GATE-12** | E2E Validation | All 14 specified end-to-end workflows executed and passed cleanly | **PASS** | `phase5-final-verification.test.ts` |
 | **GATE-13** | .ai Knowledge Base Normalization | 29 canonical files (`00_` to `28_`), zero duplicates, all internal references repaired, clean AI index created | **PASS** | Phase 0 Documentation Normalization |
+| **GATE-29** | Remember Me Authentication | Secure 30-day token, HttpOnly/SameSite cookie, unselected by default, zero password persistence, instant revocation on logout/password change/disablement | **PASS** | `phase29-remember-me-end-to-end-authentication.test.ts` (100% pass) |
+| **GATE-30** | Full Integration & Security Acceptance | Comprehensive end-to-end regression and multi-role boundary enforcement | **PASS** | `phase30-full-integration-security-regression-acceptance.test.ts` (100% pass) |
+| **GATE-31** | NBE JSON Report Package Import | Admin-only import workflow, validation drawer, sample-value stripping, SHA-256 hash preservation, SSOT DRAFT creation, zero auto-publish, backward-compatible with 24 legacy returns | **PASS** | `phase31-nbe-json-report-package-import-and-schema-normalization.test.ts` (100% pass) |
+
+---
+
+## 5. Phase 29 & 31 Acceptance Verification Summary
+
+### Phase 29: Remember Me End-to-End Authentication
+- **Default State**: Checkbox is strictly unchecked by default; email and password fields are clean.
+- **Server Persistence**: Persistent session tokens issued with 256-bit cryptographic entropy and saved in `sessionService.ts`.
+- **Cookie Security**: `ob_remember_token` issued with `HttpOnly`, `SameSite=Lax`, and `Max-Age=2592000` (30 days).
+- **Storage Safety**: Zero plaintext passwords, password hashes, or biometric templates persisted in client storage.
+- **Revocation**: Instant revocation upon explicit logout (`Max-Age=0`), password change, account disablement, or administrative session wipe.
+- **Auditing**: Audit logging for all session generation, validation, revocation, and forgery attempts.
+
+### Phase 31: NBE JSON Report Package Import & Schema Normalization
+- **Admin Workflow**: Interactive `NbeReportPackageImportModal` added to Admin Dashboard and Template Studio.
+- **Envelope & Adapter Architecture**: Versioned modern schema envelope support + legacy NBE 24 returns adapter in `nbeReportPackageNormalizer.ts`.
+- **Sample Value Stripping**: Structural metadata preserved while test financial numbers/sample values are cleanly stripped to `undefined`.
+- **Integrity & Auditing**: SHA-256 source hash and normalized definition hash computed and stored with canonical raw JSON artifact; audit event `NBE_PACKAGE_IMPORTED` emitted.
+- **Governance**: Imported reports are instantiated strictly as `DRAFT` configurations; Maker submission generation blocked until Maker-Checker 4-eyes approval and official publication.
+- **Security Hardening**: Anti-prototype-pollution (`__proto__`, `constructor`), SSRF prevention against cloud metadata/internal hosts, max file size and AST formula cycle validation.
+- **Live HTTP Endpoints**:
+  - `POST /api/config/nbe-package/validate` (200 OK)
+  - `POST /api/config/nbe-package/import` (201 Created for Admin, 403 Forbidden for Maker/Checker)
+  - `GET /api/config/nbe-package/artifacts` & `GET /api/config/nbe-package/artifacts/:hash`
+
 
 

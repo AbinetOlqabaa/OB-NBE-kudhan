@@ -35,6 +35,7 @@ import {
   Table as TableIcon,
   Calculator,
   Binary,
+  Upload,
 } from 'lucide-react';
 import {
   configService,
@@ -51,6 +52,7 @@ import { DepartmentDefinition } from '../data/organizationHierarchy.ts';
 import { departmentService } from '../services/departmentService.ts';
 import { UserSession, ReportMetadata } from '../types/regulatory.ts';
 import { vibrate } from '../utils/haptics.ts';
+import { NbeReportPackageImportModal } from './NbeReportPackageImportModal.tsx';
 
 interface ReportTemplateStudioModalProps {
   isOpen: boolean;
@@ -85,6 +87,7 @@ export const ReportTemplateStudioModal: React.FC<ReportTemplateStudioModalProps>
   const [versions, setVersions] = useState<ReportVersionSSOT[]>([]);
   const [selectedVersionNumber, setSelectedVersionNumber] = useState<number>(1);
   const [workingVersion, setWorkingVersion] = useState<ReportVersionSSOT | null>(null);
+  const [isNbeImportOpen, setIsNbeImportOpen] = useState(false);
 
   // Form State for Metadata
   const [metaForm, setMetaForm] = useState<{
@@ -877,6 +880,15 @@ export const ReportTemplateStudioModal: React.FC<ReportTemplateStudioModalProps>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNbeImportOpen(true)}
+              className="min-h-[38px] px-3.5 py-1.5 bg-ob-indigo-50 hover:bg-ob-indigo-100 dark:bg-ob-indigo-950 dark:hover:bg-ob-indigo-900 border border-ob-indigo-200 dark:border-ob-indigo-800 text-ob-indigo-700 dark:text-ob-indigo-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer touch-press"
+              title="Import an NBE-provided JSON report definition package"
+            >
+              <Upload className="w-4 h-4 text-ob-indigo-600 dark:text-ob-indigo-400" />
+              <span>Import NBE JSON</span>
+            </button>
             <button
               type="button"
               onClick={handleSaveDraft}
@@ -2239,6 +2251,49 @@ export const ReportTemplateStudioModal: React.FC<ReportTemplateStudioModalProps>
               </div>
             </div>
           </div>
+        )}
+
+        {/* NBE PACKAGE IMPORT MODAL (Phase 31) */}
+        {isNbeImportOpen && (
+          <NbeReportPackageImportModal
+            isOpen={isNbeImportOpen}
+            onClose={() => setIsNbeImportOpen(false)}
+            currentUser={currentUser}
+            onImportSuccess={(newKey, msg) => {
+              setIsNbeImportOpen(false);
+              onSuccess(msg);
+            }}
+            onOpenStudio={(newKey) => {
+              setIsNbeImportOpen(false);
+              const importedDef = configService.getReportDefinition(newKey);
+              if (importedDef) {
+                setReport(importedDef);
+                const vers = configService.getReportVersions(newKey);
+                setVersions(vers);
+                const activeOrLatest = vers[0] || null;
+                setWorkingVersion(activeOrLatest);
+                if (activeOrLatest) {
+                  setFields(activeOrLatest.fields || []);
+                  setColumns(activeOrLatest.columns || []);
+                  setSections(activeOrLatest.sections || []);
+                  setFormulas(activeOrLatest.formulas || []);
+                }
+                setMetaForm({
+                  returnKey: importedDef.returnKey,
+                  code: importedDef.code,
+                  name: importedDef.name,
+                  description: importedDef.description,
+                  category: importedDef.category,
+                  frequency: importedDef.frequency,
+                  defaultDepartmentId: importedDef.defaultDepartmentId,
+                  selectedDepartmentIds: importedDef.departmentIds || [importedDef.defaultDepartmentId],
+                  instCode: importedDef.instCode,
+                  finYear: importedDef.finYear,
+                  nbeReturnKey: importedDef.returnKey,
+                });
+              }
+            }}
+          />
         )}
       </div>
     </div>

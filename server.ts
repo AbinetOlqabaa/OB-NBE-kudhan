@@ -33,6 +33,7 @@ import { configurationGovernanceService } from './src/services/configurationGove
 import { biometricService } from './src/services/biometricService.ts';
 import { ValidationRemediationService } from './src/services/validationRemediationService.ts';
 import { sessionService } from './src/services/sessionService.ts';
+import { nbeReportPackageService } from './src/services/nbeReportPackageNormalizer.ts';
 
 dotenv.config();
 
@@ -327,6 +328,66 @@ app.post('/api/config/reports/:key/versions/:version/publish', (req, res) => {
     res.json(published);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// NBE JSON REPORT PACKAGE IMPORT & SCHEMA NORMALIZATION (Phase 31)
+// ============================================================================
+
+// Validate NBE report JSON package without mutating configuration
+app.post('/api/config/nbe-package/validate', (req, res) => {
+  try {
+    const payload = req.body.package !== undefined ? req.body.package : req.body;
+    const result = nbeReportPackageService.validatePackage(payload);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin imports NBE report JSON package and creates governed DRAFT configuration
+app.post('/api/config/nbe-package/import', (req, res) => {
+  const actor = req.body.actor || { id: 'usr_admin', name: 'Compliance Administrator', role: 'ADMIN' };
+  if (!actor || actor.role !== 'ADMIN') {
+    res.status(403).json({
+      error: 'Forbidden: Administrator role is strictly required to import NBE report JSON packages.',
+      code: 'UNAUTHORIZED_ACCESS',
+    });
+    return;
+  }
+
+  try {
+    const payload = req.body.package !== undefined ? req.body.package : req.body;
+    const imported = nbeReportPackageService.importPackageAsDraft(payload, actor);
+    res.status(201).json(imported);
+  } catch (err: any) {
+    const statusCode = err.message?.includes('Unauthorized') ? 403 : 400;
+    res.status(statusCode).json({ error: err.message });
+  }
+});
+
+// List all auditable imported source artifacts
+app.get('/api/config/nbe-package/artifacts', (req, res) => {
+  try {
+    const artifacts = nbeReportPackageService.getAllArtifacts();
+    res.json(artifacts);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Retrieve specific imported source artifact by hash
+app.get('/api/config/nbe-package/artifacts/:hash', (req, res) => {
+  try {
+    const artifact = nbeReportPackageService.getArtifactByHash(req.params.hash);
+    if (!artifact) {
+      res.status(404).json({ error: `NBE package artifact with hash '${req.params.hash}' not found.` });
+      return;
+    }
+    res.json(artifact);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

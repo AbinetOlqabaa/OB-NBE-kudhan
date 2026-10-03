@@ -1381,7 +1381,7 @@ class ConfigurationEngine {
     const activeVersion = this.getActiveVersion(returnKey);
     return {
       ...report,
-      activeVersionSnapshot: activeVersion || undefined,
+      activeVersionSnapshot: report.status === 'ACTIVE' && activeVersion ? activeVersion : undefined,
     };
   }
 
@@ -1398,7 +1398,7 @@ class ConfigurationEngine {
   public getActiveVersion(returnKey: string): ReportVersionSSOT | null {
     const list = this.versions.get(returnKey);
     if (!list || list.length === 0) return null;
-    return list.find((v) => v.status === 'ACTIVE') || list[list.length - 1];
+    return list.find((v) => v.status === 'ACTIVE') || null;
   }
 
   /**
@@ -2110,6 +2110,19 @@ class ConfigurationEngine {
 
     this.bumpVersion('REPORT');
     return report;
+  }
+
+  /**
+   * Removes a draft or test report definition from in-memory SSOT registry.
+   */
+  public deleteReport(returnKey: string): boolean {
+    const norm = returnKey.trim().toUpperCase();
+    this.versions.delete(norm);
+    const deleted = this.reports.delete(norm);
+    if (deleted) {
+      this.bumpVersion('REPORT');
+    }
+    return deleted;
   }
 
   /**

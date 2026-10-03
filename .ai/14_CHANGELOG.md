@@ -1068,3 +1068,22 @@ All notable changes and engineering enhancements for the Oromia Bank NBE Regulat
 - Comprehensive recovery assessment answering all 10 architectural inquiries.
 - Confirmation of Express/Node.js architecture and clarification of Django non-existence.
 - Verified test suites for core regulatory engines, RBAC, NBE simulator, biometrics, PDF generation, and IndexedDB storage.
+
+---
+
+## [Phase 29 & Phase 31 Implementation & Acceptance] - 2026-10-03
+### Added
+- **Phase 29: Remember Me End-to-End Authentication**:
+  - Unchecked-by-default persistent login toggle with 30-day cryptographically secure session issuance.
+  - HttpOnly and SameSite cookie transport (`ob_remember_token`) with server-side revocation on logout/password-change/disablement.
+  - Test suite: `src/tests/phase29-remember-me-end-to-end-authentication.test.ts` (100% pass across 11 test suites).
+- **Phase 31: NBE JSON Report Package Import & Schema Normalization**:
+  - Normalization engine in `src/services/nbeReportPackageNormalizer.ts` with support for modern versioned envelope and 24 legacy statutory returns.
+  - Validation engine detecting malformed JSON, schema version mismatches, duplicate field codes, circular AST formulas, and insecure protocols/SSRF targets.
+  - Sample-value stripper preserving non-changing metadata/labels and explicit schema defaults while stripping example financial figures.
+  - Governed draft creation (`DRAFT` status) preventing automatic publishing or submission creation without formal 4-eyes approval.
+  - Canonical artifact repository preserving raw JSON and SHA-256 source/normalized hashes for non-repudiation audit trails.
+  - Interactive Admin UI component `src/components/NbeReportPackageImportModal.tsx` embedded in `AdminDashboard.tsx` and `ReportTemplateStudioModal.tsx`.
+  - Express API routes: `POST /api/config/nbe-package/validate`, `POST /api/config/nbe-package/import`, `GET /api/config/nbe-package/artifacts`, `GET /api/config/nbe-package/artifacts/:hash`.
+  - Test suite: `src/tests/phase31-nbe-json-report-package-import-and-schema-normalization.test.ts` (100% pass across all 15 acceptance gates).
+
